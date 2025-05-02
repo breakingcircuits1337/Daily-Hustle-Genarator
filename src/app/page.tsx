@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -8,10 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { generateDailyHustleIdeas } from '@/ai/flows/generate-daily-hustle-ideas';
+import { generateDailyHustleIdeas, GenerateDailyHustleIdeasOutput } from '@/ai/flows/generate-daily-hustle-ideas';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { List, CheckSquare, Trash2, Loader2, DollarSign } from 'lucide-react';
+import { List, CheckSquare, Trash2, Loader2, DollarSign, LinkIcon, ExternalLink } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 const formSchema = z.object({
   userSkills: z.string().min(1, { message: 'Please enter at least one skill.' }),
@@ -23,9 +25,11 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
+// Update Idea interface to include websites
 interface Idea {
   id: string;
   text: string;
+  websites: string[]; // Array of website URLs
 }
 
 export default function Home() {
@@ -47,12 +51,12 @@ export default function Home() {
     const storedIdeas = localStorage.getItem('savedHustleIdeas');
     if (storedIdeas) {
       try {
-        const parsedIdeas = JSON.parse(storedIdeas);
-        // Ensure parsed data is an array before setting state
-        if (Array.isArray(parsedIdeas)) {
+        const parsedIdeas = JSON.parse(storedIdeas) as Idea[];
+        // Basic validation to ensure it's an array and items have expected structure
+        if (Array.isArray(parsedIdeas) && parsedIdeas.every(item => typeof item.id === 'string' && typeof item.text === 'string' && Array.isArray(item.websites))) {
           setSavedIdeas(parsedIdeas);
         } else {
-          console.error("Loaded data from localStorage is not an array:", parsedIdeas);
+          console.error("Loaded data from localStorage has invalid format:", parsedIdeas);
           localStorage.removeItem('savedHustleIdeas'); // Clear invalid data
         }
       } catch (error) {
@@ -83,15 +87,16 @@ export default function Home() {
     setIsLoading(true);
     setGeneratedIdeas([]); // Clear previous ideas
     try {
-      // generateDailyHustleIdeas expects a number for targetAmount
-      const result = await generateDailyHustleIdeas({
+      const result: GenerateDailyHustleIdeasOutput = await generateDailyHustleIdeas({
          userSkills: values.userSkills,
          targetAmount: values.targetAmount // Already a number due to zod coerce
       });
       if (result && result.ideas && Array.isArray(result.ideas)) {
-        const newIdeas = result.ideas.map((idea, index) => ({
+        // Map the result to the Idea interface
+        const newIdeas = result.ideas.map((ideaObj, index) => ({
           id: `gen-${Date.now()}-${index}`, // Simple unique ID
-          text: idea,
+          text: ideaObj.idea,
+          websites: ideaObj.suggestedWebsites || [], // Ensure websites is an array
         }));
         setGeneratedIdeas(newIdeas);
       } else {
@@ -140,12 +145,36 @@ export default function Home() {
     });
   };
 
+  // Helper to display website links nicely
+  const renderWebsiteLinks = (websites: string[]) => {
+    if (!websites || websites.length === 0) {
+      return <span className="text-xs text-muted-foreground italic">No websites suggested.</span>;
+    }
+    return (
+      <div className="flex flex-wrap gap-2 mt-1">
+        {websites.map((url, index) => (
+          <a
+            key={index}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-primary hover:underline inline-flex items-center"
+          >
+            <ExternalLink className="h-3 w-3 mr-1" />
+            {new URL(url).hostname} {/* Show hostname for brevity */}
+          </a>
+        ))}
+      </div>
+    );
+  };
+
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-8 bg-secondary">
-      <Card className="w-full max-w-2xl shadow-lg">
+      <Card className="w-full max-w-3xl shadow-lg"> {/* Increased max-width */}
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-bold text-primary">Daily Hustle Generator</CardTitle>
-          <CardDescription>Find ways to earn an extra target amount each day!</CardDescription>
+          <CardDescription>Find ways to earn an extra target amount each day, with website suggestions!</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -194,7 +223,7 @@ export default function Home() {
                     Generating Ideas...
                   </>
                 ) : (
-                  'Generate Ideas'
+                  'Generate Ideas & Websites' // Updated button text
                 )}
               </Button>
             </form>
@@ -206,17 +235,21 @@ export default function Home() {
              </div>
           )}
 
+          {/* Display Generated Ideas */}
           {generatedIdeas.length > 0 && (
             <div className="mt-8">
               <h2 className="text-xl font-semibold mb-4 flex items-center"><List className="mr-2 h-5 w-5" /> Generated Ideas</h2>
-              <ScrollArea className="h-[200px] w-full rounded-md border p-4 bg-background">
-                <ul className="space-y-2">
+              <ScrollArea className="h-[250px] w-full rounded-md border p-4 bg-background"> {/* Increased height */}
+                <ul className="space-y-4"> {/* Increased spacing */}
                   {generatedIdeas.map((idea) => (
-                    <li key={idea.id} className="flex items-center justify-between p-2 rounded hover:bg-muted">
-                      <span>{idea.text}</span>
-                       <Button variant="ghost" size="sm" onClick={() => saveIdea(idea)} aria-label="Save Idea" className="text-accent hover:text-accent-foreground hover:bg-accent/10">
-                        <CheckSquare className="h-4 w-4" />
-                        <span className="sr-only">Save Idea</span>
+                    <li key={idea.id} className="flex flex-col sm:flex-row sm:items-start sm:justify-between p-3 rounded hover:bg-muted border-b last:border-b-0"> {/* Added border */}
+                       <div className="flex-1 mb-2 sm:mb-0 sm:mr-4">
+                         <p className="font-medium">{idea.text}</p>
+                         {renderWebsiteLinks(idea.websites)}
+                      </div>
+                       <Button variant="ghost" size="sm" onClick={() => saveIdea(idea)} aria-label="Save Idea" className="text-accent hover:text-accent-foreground hover:bg-accent/10 self-start sm:self-center shrink-0">
+                        <CheckSquare className="h-4 w-4 mr-1 sm:mr-0" />
+                        <span className="sm:sr-only">Save</span>
                       </Button>
                     </li>
                   ))}
@@ -225,17 +258,21 @@ export default function Home() {
             </div>
           )}
 
+          {/* Display Saved Ideas */}
           {savedIdeas.length > 0 && (
             <div className="mt-8">
               <h2 className="text-xl font-semibold mb-4 flex items-center"><CheckSquare className="mr-2 h-5 w-5 text-accent" /> Saved Ideas</h2>
-              <ScrollArea className="h-[200px] w-full rounded-md border p-4 bg-background">
-                <ul className="space-y-2">
+              <ScrollArea className="h-[250px] w-full rounded-md border p-4 bg-background"> {/* Increased height */}
+                 <ul className="space-y-4"> {/* Increased spacing */}
                   {savedIdeas.map((idea) => (
-                    <li key={idea.id} className="flex items-center justify-between p-2 rounded hover:bg-muted">
-                      <span>{idea.text}</span>
-                      <Button variant="ghost" size="sm" onClick={() => removeSavedIdea(idea.id)} aria-label="Remove Idea" className="text-destructive hover:text-destructive-foreground hover:bg-destructive/10">
-                        <Trash2 className="h-4 w-4" />
-                         <span className="sr-only">Remove Idea</span>
+                     <li key={idea.id} className="flex flex-col sm:flex-row sm:items-start sm:justify-between p-3 rounded hover:bg-muted border-b last:border-b-0"> {/* Added border */}
+                       <div className="flex-1 mb-2 sm:mb-0 sm:mr-4">
+                         <p className="font-medium">{idea.text}</p>
+                         {renderWebsiteLinks(idea.websites)}
+                       </div>
+                       <Button variant="ghost" size="sm" onClick={() => removeSavedIdea(idea.id)} aria-label="Remove Idea" className="text-destructive hover:text-destructive-foreground hover:bg-destructive/10 self-start sm:self-center shrink-0">
+                         <Trash2 className="h-4 w-4 mr-1 sm:mr-0" />
+                         <span className="sm:sr-only">Remove</span>
                       </Button>
                     </li>
                   ))}
