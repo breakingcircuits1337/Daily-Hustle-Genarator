@@ -11,7 +11,7 @@
 
 import { ai } from '@/ai/ai-instance';
 import { z } from 'genkit';
-// Removed: import { getSites } from '@genkit-ai/web-loader';
+// Removed: import { getSites } from '@genkit-ai/web-loader'; // Corrected package name if needed
 
 const GenerateDailyHustleIdeasInputSchema = z.object({
   userSkills: z
@@ -28,7 +28,7 @@ export type GenerateDailyHustleIdeasInput = z.infer<typeof GenerateDailyHustleId
 
 const IdeaWithWebsitesSchema = z.object({
   idea: z.string().describe('A specific task or activity suggested for earning money.'),
-  suggestedWebsites: z.array(z.string().url()).describe('A list of relevant website URLs suggested for the idea.'), // Ensure URLs are valid
+  suggestedWebsites: z.array(z.string().url()).describe('A list of relevant website URLs suggested for the idea.'), // Keep .url() here for the exported type and flow output validation
 });
 
 const GenerateDailyHustleIdeasOutputSchema = z.object({
@@ -47,8 +47,32 @@ export type GenerateDailyHustleIdeasOutput = z.infer<typeof GenerateDailyHustleI
 export async function generateDailyHustleIdeas(
   input: GenerateDailyHustleIdeasInput
 ): Promise<GenerateDailyHustleIdeasOutput> {
-  return generateDailyHustleIdeasFlow(input);
+  // Add basic validation or error handling if needed before calling the flow
+  try {
+    const result = await generateDailyHustleIdeasFlow(input);
+    // Optionally validate the result against GenerateDailyHustleIdeasOutputSchema here if needed
+    return result;
+  } catch (error) {
+    console.error("Error in generateDailyHustleIdeas flow:", error);
+    // Re-throw or return a specific error structure
+    throw new Error("Failed to generate hustle ideas.");
+  }
 }
+
+// Define a simpler schema specifically for the prompt output, removing .url()
+const PromptOutputIdeaSchema = z.object({
+  idea: z.string().describe('A specific task or activity suggested for earning money.'),
+  suggestedWebsites: z.array(z.string()).describe('A list of relevant website URLs suggested for the idea.'), // Removed .url() here
+});
+
+const PromptOutputSchema = z.object({
+  ideas: z
+    .array(PromptOutputIdeaSchema)
+    .describe(
+      'A list of potential tasks or activities, each with suggested websites, that could earn approximately the target amount per day.'
+    ),
+});
+
 
 const prompt = ai.definePrompt({
   name: 'generateDailyHustleIdeasPrompt',
@@ -56,7 +80,7 @@ const prompt = ai.definePrompt({
     schema: GenerateDailyHustleIdeasInputSchema, // Use the input schema directly
   },
   output: {
-     schema: GenerateDailyHustleIdeasOutputSchema, // Use the existing output schema
+     schema: PromptOutputSchema, // Use the simpler schema without .url() for the AI output
   },
   // Removed the tools array
   prompt: `You are a creative AI assistant that helps users brainstorm ideas for earning small amounts of money and find relevant online platforms or resources.
@@ -76,14 +100,23 @@ Generate the ideas and suggest websites now.`,
 
 const generateDailyHustleIdeasFlow = ai.defineFlow<
   typeof GenerateDailyHustleIdeasInputSchema,
-  typeof GenerateDailyHustleIdeasOutputSchema
+  typeof GenerateDailyHustleIdeasOutputSchema // Flow still returns the type with .url() validation
 >({
   name: 'generateDailyHustleIdeasFlow',
   inputSchema: GenerateDailyHustleIdeasInputSchema,
-  outputSchema: GenerateDailyHustleIdeasOutputSchema,
+  outputSchema: GenerateDailyHustleIdeasOutputSchema, // Output schema for the flow includes .url()
 },
 async input => {
-  const {output} = await prompt(input);
-  // Ensure output matches the schema, provide a default empty array if null/undefined
-  return output ?? { ideas: [] };
+  const {output} = await prompt(input); // Calls the prompt with the simpler output schema
+
+  // Ensure output exists and matches the expected structure before returning
+  if (!output || !output.ideas) {
+     console.warn("Prompt returned null or undefined output. Returning empty ideas list.");
+     return { ideas: [] };
+  }
+
+  // Although the prompt output schema doesn't enforce .url(), the flow's output schema does.
+  // Zod will validate this return value against GenerateDailyHustleIdeasOutputSchema.
+  // If the AI returns invalid URLs, Zod will throw an error here.
+  return output;
 });
