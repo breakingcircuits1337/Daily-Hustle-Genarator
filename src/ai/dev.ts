@@ -1,1 +1,2 @@
-import '@/ai/flows/generate-daily-hustle-ideas.ts';
+import '@/ai/flows/generate-daily-hustle-ideas';
+```
