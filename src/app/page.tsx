@@ -52,7 +52,7 @@ const affiliateLinks: AffiliateLink[] = [
     category: "Health & Fitness",
   },
   {
-    url: "https://36db9-ueu3s13n5pmkpeeiso7d.hop.clickbank.net", // CPA link, assumed
+    url: "https://36db9-ueu3s13n5pmkpeeiso7d.hop.clickbank.net",
     title: "Exclusive CPA Offer",
     description: "Check out this special Cost Per Acquisition offer for online marketers.",
     category: "Online Marketing",
@@ -74,6 +74,102 @@ const affiliateLinks: AffiliateLink[] = [
     title: "Learn to Sketch Easily",
     description: "An easy-to-follow course for anyone wanting to master the art of sketching, with practical methods and tips.",
     category: "Art & Hobbies",
+  },
+  {
+    url: "https://bbad395evcw1ftekz1jrrzwzaz.hop.clickbank.net",
+    title: "Magical Tactics (Proven tactics to attract women)",
+    description: "Pick up & Seduction guide paying 70% per sale. This is a long term product which is a proven seller.",
+    category: "Self-Help",
+  },
+  {
+    url: "https://4fb895ug-ds21r4jy6pio7jd0x.hop.clickbank.net",
+    title: "Pure Natural Manifestation",
+    description: "New hook for the Law of Attraction and Manifestation market, based on the transformational energies of the spiritual vortexes at Sedona.",
+    category: "Manifestation",
+  },
+  {
+    url: "https://3c991-wdmdu8aqejm820lmi95l.hop.clickbank.net",
+    title: "Reality Engineering Code",
+    description: "A unique manifestation system that activates your \"wealth command center\" using advanced ultrasound soundwave technology.",
+    category: "Wealth & Manifestation",
+  },
+  {
+    url: "https://d54979t9xby57n1g76qlhe1y7b.hop.clickbank.net",
+    title: "The Pharaoh's Secret",
+    description: "Killer VSL offer that will crush all your traffic. $100 AOV plus over $150,000 on cold traffic before launch.",
+    category: "Marketing",
+  },
+  {
+    url: "https://192adavllar32q8no1xdx6w-iw.hop.clickbank.net",
+    title: "Instant Wordpress Theme Matcher",
+    description: "World's first automatic HTML to WordPress converter. Instantly create themes matching your existing site design.",
+    category: "Web Tools",
+  },
+  {
+    url: "https://456428sgz2t30y054d4p6met0w.hop.clickbank.net",
+    title: "Fast & Easy Commissions (2025)",
+    description: "Make Money Online Offer. Affiliates earning up to $252.75 per sale! 75% commission on entire funnel.",
+    category: "Make Money Online",
+  },
+  {
+    url: "https://51eea26ds1y1dk1912lfs6glpc.hop.clickbank.net",
+    title: "Infinite Manifestation Code (2025)",
+    description: "Brand new offer from a CB Platinum Vendor, focused on high EPC and CNVR for manifestation.",
+    category: "Manifestation",
+  },
+  {
+    url: "https://fa3b36whxao5emc09gumeo5n43.hop.clickbank.net",
+    title: "Vitrafoxin",
+    description: "Military Cover-Up Memory Loss Offer. Unique 'Cannibal Cell' angle + Harvard-backed mushroom formula.",
+    category: "Health & Wellness",
+  },
+  {
+    url: "https://96d16a5jpzq4cldn0pcgqj0s9c.hop.clickbank.net",
+    title: "Total Money Magnetism",
+    description: "New high converting offer by Dr Steve G Jones, from the creators of Manifestation Miracle. 75% front end.",
+    category: "Wealth & Manifestation",
+  },
+  {
+    url: "https://4f49e3vlu-218y25phh1gw5s8y.hop.clickbank.net",
+    title: "Fast Wealth",
+    description: "$90K spent on FB ads, 8 VSL versions tested! High potential for wealth generation.",
+    category: "Make Money Online",
+  },
+  {
+    url: "https://d0417--iv1vy0r4rz3svxk0z36.hop.clickbank.net",
+    title: "Live Chat Jobs",
+    description: "$1 trial, unlimited re-bills, optimized upsell flow, 75% commission. In-house affiliate management.",
+    category: "Remote Work",
+  },
+  {
+    url: "https://a7677a1gtzx60rcg0btzvhkarr.hop.clickbank.net",
+    title: "Get Paid To Use Social Media",
+    description: "12 years on CB! Get paid to be on Facebook, Twitter, YouTube. For Social Media and MMO traffic.",
+    category: "Make Money Online",
+  },
+  {
+    url: "https://d5f2a14cuzy09yfntbocryx-3v.hop.clickbank.net",
+    title: "Cellphone Cash",
+    description: "HUGE CONVERSIONS, Over $2 Million spent in testing! Low ticket offer for 2025.",
+    category: "Make Money Online",
+  },
+  {
+    url: "https://07a79azir8wxbw8am7hyueuo35.hop.clickbank.net",
+    title: "Click Earners: Virtual Online Assistant",
+    description: "The Ultimate Work From Home Offer. 75% Commission on Front End + Upsells. Geo-Targeting.",
+    category: "Remote Work",
+  },
+  {
+    url: "https://8b2995x9y1w85xa2wlodv7fle0.hop.clickbank.net",
+    title: "The GPT Creator Club",
+    description: "Brand New DFY Service by John Thornhill & Randy Smith providing monthly GPTs with White Label Rights.",
+    category: "AI & Business",
+  },
+  {
+    url: "https://19cc1zyhu2t45r4bqgnnn9br4o.hop.clickbank.net",
+    title: "FREE Traffic System - FD Marketing",
+    description: "Learn to get FREE traffic to any offer in any niche while building your following on various platforms.",
+    category: "Marketing",
   }
 ];
 
@@ -166,8 +262,10 @@ export default function Home() {
         description = "The request was blocked by safety settings. Try modifying your input.";
       } else if (error instanceof Error && error.message.includes("invalid URLs")) {
         description = "The AI returned some invalid website links. We're showing the ideas anyway.";
-        if ((error.cause as any)?.ideas) { 
-           const partialIdeas = (error.cause as any).ideas.map((ideaObj:any, index:number) => ({
+        // Attempt to process partially successful data if the error structure includes it
+        const cause = (error as any).cause;
+        if (cause && Array.isArray(cause.ideas)) {
+           const partialIdeas = cause.ideas.map((ideaObj:any, index:number) => ({
             id: `gen-err-${Date.now()}-${index}`,
             text: ideaObj.idea,
             websites: Array.isArray(ideaObj.suggestedWebsites) ? ideaObj.suggestedWebsites.filter((ws: any) => typeof ws === 'string') : [],
@@ -178,6 +276,17 @@ export default function Home() {
             const randomIndex = Math.floor(Math.random() * affiliateLinks.length);
             setHighlightedOffer(affiliateLinks[randomIndex]);
           }
+        } else if ((error as any).data && Array.isArray((error as any).data.ideas)) { // Check another common pattern for wrapped data
+            const partialIdeas = (error as any).data.ideas.map((ideaObj:any, index:number) => ({
+              id: `gen-err-${Date.now()}-${index}`,
+              text: ideaObj.idea,
+              websites: Array.isArray(ideaObj.suggestedWebsites) ? ideaObj.suggestedWebsites.filter((ws: any) => typeof ws === 'string') : [],
+            }));
+            setGeneratedIdeas(partialIdeas);
+            if (affiliateLinks.length > 0) {
+              const randomIndex = Math.floor(Math.random() * affiliateLinks.length);
+              setHighlightedOffer(affiliateLinks[randomIndex]);
+            }
         }
       }
       toast({
@@ -224,7 +333,13 @@ export default function Home() {
       <div className="flex flex-wrap gap-2 mt-1">
         {websites.map((url, index) => {
           try {
-            const validUrl = new URL(url.startsWith('http') ? url : `https://${url}`);
+            // Ensure URL has a protocol, default to https if missing
+            const fullUrl = url.includes('://') ? url : `https://${url}`;
+            const validUrl = new URL(fullUrl);
+            // Prevent javascript: URLs or other non-http/https protocols
+            if (!['http:', 'https:'].includes(validUrl.protocol)) {
+                 throw new Error('Invalid protocol');
+            }
             return (
               <a
                 key={index}
@@ -238,9 +353,11 @@ export default function Home() {
               </a>
             );
           } catch (e) {
+            // Display the problematic string carefully, avoiding it being interactive if malformed
+            const displayText = url.length > 30 ? `${url.substring(0, 27)}...` : url;
             return (
               <span key={index} className="text-xs text-muted-foreground italic" title={`Invalid URL: ${url}`}>
-                {url.length > 30 ? `${url.substring(0, 27)}...` : url} (invalid link)
+                {displayText} (invalid link)
               </span>
             );
           }
@@ -423,3 +540,5 @@ export default function Home() {
     </main>
   );
 }
+
+    
