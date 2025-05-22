@@ -12,7 +12,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { generateDailyHustleIdeas, GenerateDailyHustleIdeasOutput } from '@/ai/flows/generate-daily-hustle-ideas';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { List, CheckSquare, Trash2, Loader2, DollarSign, ExternalLink } from 'lucide-react'; // Removed LinkIcon as it wasn't used
+import { List, CheckSquare, Trash2, Loader2, DollarSign, ExternalLink, Gift } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 const formSchema = z.object({
@@ -30,6 +30,53 @@ interface Idea {
   text: string;
   websites: string[];
 }
+
+interface AffiliateLink {
+  url: string;
+  title: string;
+  description: string;
+  category?: string;
+}
+
+const affiliateLinks: AffiliateLink[] = [
+  {
+    url: "https://16aaa2yclbv-au53ybvbkpvre4.hop.clickbank.net",
+    title: "Air Fountain: Turn Air Into Water",
+    description: "Discover how to turn air into water. A unique offer in the self-help and survival niche.",
+    category: "Survival",
+  },
+  {
+    url: "https://728475ymtb0y0pads6p-bgl68r.hop.clickbank.net",
+    title: "Nano-Ease: Pain Relief Technology",
+    description: "Explore this nano-technology pain relief solution in health & fitness dietary supplements.",
+    category: "Health & Fitness",
+  },
+  {
+    url: "https://36db9-ueu3s13n5pmkpeeiso7d.hop.clickbank.net", // CPA link, assumed
+    title: "Exclusive CPA Offer",
+    description: "Check out this special Cost Per Acquisition offer for online marketers.",
+    category: "Online Marketing",
+  },
+  {
+    url: "https://8d0b45-8xdv41mboagolp12gy7.hop.clickbank.net",
+    title: "DIY 3D Solar Panel Guide",
+    description: "Learn to build your own 3D solar panel with this high-converting video guide.",
+    category: "DIY & Energy",
+  },
+  {
+    url: "https://e7164-tln215cw95vcsi4p1wes.hop.clickbank.net",
+    title: "High-Converting Personal Development Offer",
+    description: "Tap into personal development, internet marketing, and health niches. Potential to earn up to $250 per sale.",
+    category: "Personal Development",
+  },
+  {
+    url: "https://641337uhqcsx1n69ozpo1phz2i.hop.clickbank.net",
+    title: "Learn to Sketch Easily",
+    description: "An easy-to-follow course for anyone wanting to master the art of sketching, with practical methods and tips.",
+    category: "Art & Hobbies",
+  }
+];
+
 
 export default function Home() {
   const [generatedIdeas, setGeneratedIdeas] = useState<Idea[]>([]);
@@ -111,12 +158,11 @@ export default function Home() {
         description = "The request was blocked by safety settings. Try modifying your input.";
       } else if (error instanceof Error && error.message.includes("invalid URLs")) {
         description = "The AI returned some invalid website links. We're showing the ideas anyway.";
-         // If ideas part is still usable, we might get partial results
-        if (error.cause && (error.cause as any).ideas) {
+        if ((error.cause as any)?.ideas) { // Check if cause and ideas exist
            const partialIdeas = (error.cause as any).ideas.map((ideaObj:any, index:number) => ({
             id: `gen-err-${Date.now()}-${index}`,
             text: ideaObj.idea,
-            websites: Array.isArray(ideaObj.suggestedWebsites) ? ideaObj.suggestedWebsites.filter((ws: any) => typeof ws === 'string') : [], // best effort
+            websites: Array.isArray(ideaObj.suggestedWebsites) ? ideaObj.suggestedWebsites.filter((ws: any) => typeof ws === 'string') : [],
           }));
           setGeneratedIdeas(partialIdeas);
         }
@@ -165,14 +211,13 @@ export default function Home() {
       <div className="flex flex-wrap gap-2 mt-1">
         {websites.map((url, index) => {
           try {
-            // Attempt to create a URL to validate and extract hostname
             const validUrl = new URL(url.startsWith('http') ? url : `https://${url}`);
             return (
               <a
                 key={index}
                 href={validUrl.href}
                 target="_blank"
-                rel="noopener noreferrer"
+                rel="noopener noreferrer nofollow"
                 className="text-xs text-primary hover:underline inline-flex items-center"
               >
                 <ExternalLink className="h-3 w-3 mr-1" />
@@ -180,7 +225,6 @@ export default function Home() {
               </a>
             );
           } catch (e) {
-            // If URL is invalid, display it as plain text or a placeholder
             return (
               <span key={index} className="text-xs text-muted-foreground italic" title={`Invalid URL: ${url}`}>
                 {url.length > 30 ? `${url.substring(0, 27)}...` : url} (invalid link)
@@ -195,7 +239,7 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-between p-4 md:p-8 bg-secondary">
-      <Card className="w-full max-w-3xl shadow-lg mb-auto mt-auto"> {/* Added mb-auto mt-auto for centering when content is short */}
+      <Card className="w-full max-w-3xl shadow-lg mb-auto mt-auto">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-bold text-primary">Daily Hustle Generator</CardTitle>
           <CardDescription>Find ways to earn an extra target amount each day, with website suggestions!</CardDescription>
@@ -302,6 +346,31 @@ export default function Home() {
               </ScrollArea>
             </div>
           )}
+
+          {affiliateLinks.length > 0 && (
+            <div className="mt-8">
+              <h2 className="text-xl font-semibold mb-4 flex items-center">
+                <Gift className="mr-2 h-5 w-5 text-primary" /> Recommended Offers
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {affiliateLinks.map((link, index) => (
+                  <div key={index} className="p-4 border rounded-lg shadow-sm bg-card hover:shadow-md transition-shadow flex flex-col justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-primary mb-1">{link.title}</h3>
+                      {link.category && <Badge variant="secondary" className="mb-2 text-xs">{link.category}</Badge>}
+                      <p className="text-sm text-muted-foreground mb-3">{link.description}</p>
+                    </div>
+                    <Button asChild variant="outline" size="sm" className="mt-auto w-full sm:w-auto self-start">
+                      <a href={link.url} target="_blank" rel="noopener noreferrer nofollow">
+                        Learn More <ExternalLink className="ml-2 h-4 w-4" />
+                      </a>
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
         </CardContent>
       </Card>
       <footer className="w-full text-center p-4 text-sm text-muted-foreground">
