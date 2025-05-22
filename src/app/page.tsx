@@ -84,6 +84,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const [currentYear, setCurrentYear] = useState<number | null>(null);
+  const [highlightedOffer, setHighlightedOffer] = useState<AffiliateLink | null>(null);
 
   useEffect(() => {
     setCurrentYear(new Date().getFullYear());
@@ -131,18 +132,25 @@ export default function Home() {
   async function onSubmit(values: FormData) {
     setIsLoading(true);
     setGeneratedIdeas([]);
+    setHighlightedOffer(null); // Clear previous highlighted offer
     try {
       const result: GenerateDailyHustleIdeasOutput = await generateDailyHustleIdeas({
          userSkills: values.userSkills,
          targetAmount: values.targetAmount
       });
-      if (result && result.ideas && Array.isArray(result.ideas)) {
+      if (result && typeof result.ideas !== 'undefined' && Array.isArray(result.ideas)) {
         const newIdeas = result.ideas.map((ideaObj, index) => ({
           id: `gen-${Date.now()}-${index}`,
           text: ideaObj.idea,
           websites: ideaObj.suggestedWebsites || [],
         }));
         setGeneratedIdeas(newIdeas);
+
+        if (affiliateLinks.length > 0) {
+          const randomIndex = Math.floor(Math.random() * affiliateLinks.length);
+          setHighlightedOffer(affiliateLinks[randomIndex]);
+        }
+
       } else {
         console.error("Invalid response format from generateDailyHustleIdeas:", result);
         toast({
@@ -158,13 +166,18 @@ export default function Home() {
         description = "The request was blocked by safety settings. Try modifying your input.";
       } else if (error instanceof Error && error.message.includes("invalid URLs")) {
         description = "The AI returned some invalid website links. We're showing the ideas anyway.";
-        if ((error.cause as any)?.ideas) { // Check if cause and ideas exist
+        if ((error.cause as any)?.ideas) { 
            const partialIdeas = (error.cause as any).ideas.map((ideaObj:any, index:number) => ({
             id: `gen-err-${Date.now()}-${index}`,
             text: ideaObj.idea,
             websites: Array.isArray(ideaObj.suggestedWebsites) ? ideaObj.suggestedWebsites.filter((ws: any) => typeof ws === 'string') : [],
           }));
           setGeneratedIdeas(partialIdeas);
+           // Optionally, still set a highlighted offer on partial success
+           if (affiliateLinks.length > 0) {
+            const randomIndex = Math.floor(Math.random() * affiliateLinks.length);
+            setHighlightedOffer(affiliateLinks[randomIndex]);
+          }
         }
       }
       toast({
@@ -303,6 +316,33 @@ export default function Home() {
              </div>
           )}
 
+          {!isLoading && highlightedOffer && (
+            <div className="mt-8">
+              <Card className="border-2 border-primary shadow-xl bg-gradient-to-r from-primary/5 via-card to-accent/5 p-1">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-xl flex items-center text-primary">
+                     <Gift className="mr-2 h-5 w-5" />
+                     Boost Your Hustle!
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="p-3 border rounded-lg shadow-sm bg-card flex flex-col justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-primary mb-1">{highlightedOffer.title}</h3>
+                      {highlightedOffer.category && <Badge variant="secondary" className="mb-2 text-xs">{highlightedOffer.category}</Badge>}
+                      <p className="text-sm text-muted-foreground mb-3">{highlightedOffer.description}</p>
+                    </div>
+                    <Button asChild variant="default" size="sm" className="mt-auto w-full sm:w-auto self-start">
+                      <a href={highlightedOffer.url} target="_blank" rel="noopener noreferrer nofollow">
+                        Check it out <ExternalLink className="ml-2 h-4 w-4" />
+                      </a>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           {generatedIdeas.length > 0 && (
             <div className="mt-8">
               <h2 className="text-xl font-semibold mb-4 flex items-center"><List className="mr-2 h-5 w-5" /> Generated Ideas</h2>
@@ -350,10 +390,10 @@ export default function Home() {
           {affiliateLinks.length > 0 && (
             <div className="mt-8">
               <h2 className="text-xl font-semibold mb-4 flex items-center">
-                <Gift className="mr-2 h-5 w-5 text-primary" /> Recommended Offers
+                <Gift className="mr-2 h-5 w-5 text-primary" /> More Recommended Offers
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {affiliateLinks.map((link, index) => (
+                {affiliateLinks.filter(link => !highlightedOffer || link.url !== highlightedOffer.url).map((link, index) => (
                   <div key={index} className="p-4 border rounded-lg shadow-sm bg-card hover:shadow-md transition-shadow flex flex-col justify-between">
                     <div>
                       <h3 className="text-lg font-semibold text-primary mb-1">{link.title}</h3>
