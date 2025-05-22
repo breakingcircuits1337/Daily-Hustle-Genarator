@@ -12,24 +12,23 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { generateDailyHustleIdeas, GenerateDailyHustleIdeasOutput } from '@/ai/flows/generate-daily-hustle-ideas';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { List, CheckSquare, Trash2, Loader2, DollarSign, LinkIcon, ExternalLink } from 'lucide-react';
+import { List, CheckSquare, Trash2, Loader2, DollarSign, ExternalLink } from 'lucide-react'; // Removed LinkIcon as it wasn't used
 import { Badge } from '@/components/ui/badge';
 
 const formSchema = z.object({
   userSkills: z.string().min(1, { message: 'Please enter at least one skill.' }),
   targetAmount: z.coerce // Use coerce to convert string input to number
     .number({ invalid_type_error: 'Please enter a valid number.' })
-    .min(1, { message: 'Target amount must be at least $1.' })
+    .min(0.01, { message: 'Target amount must be at least $0.01.' }) // Allow small amounts
     .positive({ message: 'Target amount must be positive.' }),
 });
 
 type FormData = z.infer<typeof formSchema>;
 
-// Update Idea interface to include websites
 interface Idea {
   id: string;
   text: string;
-  websites: string[]; // Array of website URLs
+  websites: string[];
 }
 
 export default function Home() {
@@ -37,39 +36,40 @@ export default function Home() {
   const [savedIdeas, setSavedIdeas] = useState<Idea[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const [currentYear, setCurrentYear] = useState<number | null>(null);
+
+  useEffect(() => {
+    setCurrentYear(new Date().getFullYear());
+  }, []);
+
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       userSkills: '',
-      targetAmount: 3, // Default target amount
+      targetAmount: 3,
     },
   });
 
-  // Load saved ideas from localStorage on component mount
   useEffect(() => {
     const storedIdeas = localStorage.getItem('savedHustleIdeas');
     if (storedIdeas) {
       try {
         const parsedIdeas = JSON.parse(storedIdeas) as Idea[];
-        // Basic validation to ensure it's an array and items have expected structure
         if (Array.isArray(parsedIdeas) && parsedIdeas.every(item => typeof item.id === 'string' && typeof item.text === 'string' && Array.isArray(item.websites))) {
           setSavedIdeas(parsedIdeas);
         } else {
           console.error("Loaded data from localStorage has invalid format:", parsedIdeas);
-          localStorage.removeItem('savedHustleIdeas'); // Clear invalid data
+          localStorage.removeItem('savedHustleIdeas');
         }
       } catch (error) {
         console.error("Failed to parse saved ideas from localStorage", error);
-        localStorage.removeItem('savedHustleIdeas'); // Clear corrupted data
+        localStorage.removeItem('savedHustleIdeas');
       }
     }
   }, []);
 
-
-  // Save ideas to localStorage whenever savedIdeas state changes
   useEffect(() => {
-    // Only save if there are ideas to prevent saving "[]" or corrupted data
     if (savedIdeas.length > 0) {
       try {
         localStorage.setItem('savedHustleIdeas', JSON.stringify(savedIdeas));
@@ -77,26 +77,23 @@ export default function Home() {
          console.error("Failed to save ideas to localStorage", error);
       }
     } else {
-       // Clear localStorage if no ideas are saved
        localStorage.removeItem('savedHustleIdeas');
     }
   }, [savedIdeas]);
 
-
   async function onSubmit(values: FormData) {
     setIsLoading(true);
-    setGeneratedIdeas([]); // Clear previous ideas
+    setGeneratedIdeas([]);
     try {
       const result: GenerateDailyHustleIdeasOutput = await generateDailyHustleIdeas({
          userSkills: values.userSkills,
-         targetAmount: values.targetAmount // Already a number due to zod coerce
+         targetAmount: values.targetAmount
       });
       if (result && result.ideas && Array.isArray(result.ideas)) {
-        // Map the result to the Idea interface
         const newIdeas = result.ideas.map((ideaObj, index) => ({
-          id: `gen-${Date.now()}-${index}`, // Simple unique ID
+          id: `gen-${Date.now()}-${index}`,
           text: ideaObj.idea,
-          websites: ideaObj.suggestedWebsites || [], // Ensure websites is an array
+          websites: ideaObj.suggestedWebsites || [],
         }));
         setGeneratedIdeas(newIdeas);
       } else {
@@ -109,9 +106,24 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Error generating ideas:', error);
+      let description = 'An error occurred while generating ideas. Please try again.';
+      if (error instanceof Error && error.message.includes("prompt was blocked")) {
+        description = "The request was blocked by safety settings. Try modifying your input.";
+      } else if (error instanceof Error && error.message.includes("invalid URLs")) {
+        description = "The AI returned some invalid website links. We're showing the ideas anyway.";
+         // If ideas part is still usable, we might get partial results
+        if (error.cause && (error.cause as any).ideas) {
+           const partialIdeas = (error.cause as any).ideas.map((ideaObj:any, index:number) => ({
+            id: `gen-err-${Date.now()}-${index}`,
+            text: ideaObj.idea,
+            websites: Array.isArray(ideaObj.suggestedWebsites) ? ideaObj.suggestedWebsites.filter((ws: any) => typeof ws === 'string') : [], // best effort
+          }));
+          setGeneratedIdeas(partialIdeas);
+        }
+      }
       toast({
-        title: 'Error',
-        description: 'An error occurred while generating ideas. Please try again.',
+        title: 'Error Generating Ideas',
+        description: description,
         variant: 'destructive',
       });
     } finally {
@@ -145,33 +157,45 @@ export default function Home() {
     });
   };
 
-  // Helper to display website links nicely
   const renderWebsiteLinks = (websites: string[]) => {
     if (!websites || websites.length === 0) {
       return <span className="text-xs text-muted-foreground italic">No websites suggested.</span>;
     }
     return (
       <div className="flex flex-wrap gap-2 mt-1">
-        {websites.map((url, index) => (
-          <a
-            key={index}
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-primary hover:underline inline-flex items-center"
-          >
-            <ExternalLink className="h-3 w-3 mr-1" />
-            {new URL(url).hostname} {/* Show hostname for brevity */}
-          </a>
-        ))}
+        {websites.map((url, index) => {
+          try {
+            // Attempt to create a URL to validate and extract hostname
+            const validUrl = new URL(url.startsWith('http') ? url : `https://${url}`);
+            return (
+              <a
+                key={index}
+                href={validUrl.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-primary hover:underline inline-flex items-center"
+              >
+                <ExternalLink className="h-3 w-3 mr-1" />
+                {validUrl.hostname}
+              </a>
+            );
+          } catch (e) {
+            // If URL is invalid, display it as plain text or a placeholder
+            return (
+              <span key={index} className="text-xs text-muted-foreground italic" title={`Invalid URL: ${url}`}>
+                {url.length > 30 ? `${url.substring(0, 27)}...` : url} (invalid link)
+              </span>
+            );
+          }
+        })}
       </div>
     );
   };
 
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-8 bg-secondary">
-      <Card className="w-full max-w-3xl shadow-lg"> {/* Increased max-width */}
+    <main className="flex min-h-screen flex-col items-center justify-between p-4 md:p-8 bg-secondary">
+      <Card className="w-full max-w-3xl shadow-lg mb-auto mt-auto"> {/* Added mb-auto mt-auto for centering when content is short */}
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-bold text-primary">Daily Hustle Generator</CardTitle>
           <CardDescription>Find ways to earn an extra target amount each day, with website suggestions!</CardDescription>
@@ -223,7 +247,7 @@ export default function Home() {
                     Generating Ideas...
                   </>
                 ) : (
-                  'Generate Ideas & Websites' // Updated button text
+                  'Generate Ideas & Websites'
                 )}
               </Button>
             </form>
@@ -235,14 +259,13 @@ export default function Home() {
              </div>
           )}
 
-          {/* Display Generated Ideas */}
           {generatedIdeas.length > 0 && (
             <div className="mt-8">
               <h2 className="text-xl font-semibold mb-4 flex items-center"><List className="mr-2 h-5 w-5" /> Generated Ideas</h2>
-              <ScrollArea className="h-[250px] w-full rounded-md border p-4 bg-background"> {/* Increased height */}
-                <ul className="space-y-4"> {/* Increased spacing */}
+              <ScrollArea className="h-[250px] w-full rounded-md border p-4 bg-background">
+                <ul className="space-y-4">
                   {generatedIdeas.map((idea) => (
-                    <li key={idea.id} className="flex flex-col sm:flex-row sm:items-start sm:justify-between p-3 rounded hover:bg-muted border-b last:border-b-0"> {/* Added border */}
+                    <li key={idea.id} className="flex flex-col sm:flex-row sm:items-start sm:justify-between p-3 rounded hover:bg-muted/50 border-b last:border-b-0">
                        <div className="flex-1 mb-2 sm:mb-0 sm:mr-4">
                          <p className="font-medium">{idea.text}</p>
                          {renderWebsiteLinks(idea.websites)}
@@ -258,14 +281,13 @@ export default function Home() {
             </div>
           )}
 
-          {/* Display Saved Ideas */}
           {savedIdeas.length > 0 && (
             <div className="mt-8">
               <h2 className="text-xl font-semibold mb-4 flex items-center"><CheckSquare className="mr-2 h-5 w-5 text-accent" /> Saved Ideas</h2>
-              <ScrollArea className="h-[250px] w-full rounded-md border p-4 bg-background"> {/* Increased height */}
-                 <ul className="space-y-4"> {/* Increased spacing */}
+              <ScrollArea className="h-[250px] w-full rounded-md border p-4 bg-background">
+                 <ul className="space-y-4">
                   {savedIdeas.map((idea) => (
-                     <li key={idea.id} className="flex flex-col sm:flex-row sm:items-start sm:justify-between p-3 rounded hover:bg-muted border-b last:border-b-0"> {/* Added border */}
+                     <li key={idea.id} className="flex flex-col sm:flex-row sm:items-start sm:justify-between p-3 rounded hover:bg-muted/50 border-b last:border-b-0">
                        <div className="flex-1 mb-2 sm:mb-0 sm:mr-4">
                          <p className="font-medium">{idea.text}</p>
                          {renderWebsiteLinks(idea.websites)}
@@ -282,6 +304,13 @@ export default function Home() {
           )}
         </CardContent>
       </Card>
+      <footer className="w-full text-center p-4 text-sm text-muted-foreground">
+        {currentYear !== null ? (
+          <p>&copy; {currentYear} Daily Hustle Generator. Sparking your next side gig.</p>
+        ) : (
+          <p>&copy; Daily Hustle Generator. Sparking your next side gig.</p> 
+        )}
+      </footer>
     </main>
   );
 }
